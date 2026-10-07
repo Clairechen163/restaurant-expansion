@@ -1,0 +1,12 @@
+[project]
+name = "restaurant-expansion"
+version = "0.1.0"
+description = "Rank candidate cities for a new restaurant outlet using linear regression on city population."
+requires-python = ">=3.9"
+dependencies = ["numpy>=1.24", "pandas>=2.0", "matplotlib>=3.7"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
