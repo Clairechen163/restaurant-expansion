@@ -1,4 +1,7 @@
 # Restaurant Expansion: Which City Next?
+[![Python application](https://github.com/Clairechen163/restaurant-expansion/actions/workflows/python-app.yml/badge.svg)](https://github.com/Clairechen163/restaurant-expansion/actions/workflows/python-app.yml)
+![Python](https://img.shields.io/badge/python-3.10+-blue)
+![License](https://img.shields.io/badge/license-MIT-green)
 
 Suppose you are the CEO of a restaurant franchise deciding where to open a new outlet.
 You have **profit and population** for cities that already have a restaurant, and only
@@ -12,8 +15,11 @@ by predicted profit**.
 ## Quick start
 
 ```bash
-git clone <your-repo-url> && cd restaurant-expansion
-python -m venv .venv && source .venv/bin/activate
+git clone https://github.com/Clairechen163/restaurant-expansion.git
+cd restaurant-expansion
+python -m venv .venv
+.venv\Scripts\activate        # Windows PowerShell
+# source .venv/bin/activate   # Mac/Linux
 pip install -r requirements.txt
 pip install -e .
 
