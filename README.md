@@ -2,10 +2,8 @@
 [![Python application](https://github.com/Clairechen163/restaurant-expansion/actions/workflows/python-app.yml/badge.svg)](https://github.com/Clairechen163/restaurant-expansion/actions/workflows/python-app.yml)
 ![Python](https://img.shields.io/badge/python-3.10+-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
-
 [![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://restaurant-expansion.streamlit.app)
-
-![Profit vs. population fit](docs/fit.png)
+<img src="docs/fit.png" alt="Profit vs. population fit" width="600">
 
 Suppose you are the CEO of a restaurant franchise deciding where to open a new outlet.
 You have **profit and population** for cities that already have a restaurant, and only
@@ -30,6 +28,9 @@ pip install -e .
 python -m restaurant_expansion              # closed-form (normal equation)
 python -m restaurant_expansion --method gd  # gradient descent + convergence plot
 pytest                                      # run tests
+
+pip install -r requirements-app.txt
+python -m streamlit run app/streamlit_app.py   # interactive dashboard
 ```
 
 Outputs go to `outputs/`: `ranked_candidates.csv`, `fit.png`, and `convergence.png` (gd only).
@@ -68,8 +69,7 @@ tests/       pytest suite
   rent, competition, income, foot traffic, and demographics.
 - Predictions for populations outside the range seen in existing cities (extrapolation) are unreliable.
   Check candidate cities whose population is larger than any existing outlet.
-- Ideas: multivariate regression, prediction intervals, cross-validation, a Streamlit dashboard.
-
+- Ideas: multivariate regression, prediction intervals, cross-validation.
 ## License
 
 MIT
