@@ -3,6 +3,8 @@
 ![Python](https://img.shields.io/badge/python-3.10+-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
+[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://restaurant-expansion.streamlit.app)
+
 ![Profit vs. population fit](docs/fit.png)
 
 Suppose you are the CEO of a restaurant franchise deciding where to open a new outlet.
