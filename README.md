@@ -2,7 +2,9 @@
 [![Python application](https://github.com/Clairechen163/restaurant-expansion/actions/workflows/python-app.yml/badge.svg)](https://github.com/Clairechen163/restaurant-expansion/actions/workflows/python-app.yml)
 ![Python](https://img.shields.io/badge/python-3.10+-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
+
 ![Profit vs. population fit](docs/fit.png)
+
 Suppose you are the CEO of a restaurant franchise deciding where to open a new outlet.
 You have **profit and population** for cities that already have a restaurant, and only
 **population** for candidate cities. This project fits a linear regression
