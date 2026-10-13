@@ -63,7 +63,7 @@ tests/       pytest suite
 - Population alone is a weak predictor (sample R² ≈ 0.6). Real decisions should also consider
   rent, competition, income, foot traffic, and demographics.
 - Predictions for populations outside the range seen in existing cities (extrapolation) are unreliable.
-  Check `Metro City`-style outliers manually.
+  Check candidate cities whose population is larger than any existing outlet.
 - Ideas: multivariate regression, prediction intervals, cross-validation, a Streamlit dashboard.
 
 ## License
