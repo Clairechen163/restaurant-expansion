@@ -60,12 +60,12 @@ def _label_points(ax, cand, pred_col):
                         textcoords="offset points", xytext=(5, -10), fontsize=8)
         return
     n = len(cand)
-    step = min(0.055, 0.45 / max(n, 1))
+    step = min(0.05, 0.36 / max(n, 1))
     for i, (_, r) in enumerate(cand.sort_values("population", ascending=False).iterrows()):
         ax.annotate(
             f"{r['city']}  ({r[pred_col]:,.0f})", (r["population"], r[pred_col]),
             xycoords="data", textcoords="axes fraction",
-            xytext=(0.60, 0.36 - i * step), fontsize=8, ha="left", va="center",
+            xytext=(0.60, 0.42 - i * step), fontsize=8, ha="left", va="center",
             arrowprops={"arrowstyle": "-", "color": "gray", "lw": 0.5, "alpha": 0.7},
         )
 

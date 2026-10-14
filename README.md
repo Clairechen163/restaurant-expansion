@@ -31,8 +31,8 @@ python -m restaurant_expansion --evaluate      # cross-validation + residual dia
 pytest                                         # run tests
 
 # Real data (free Census API key: https://api.census.gov/data/key_signup.html)
-$env:CENSUS_API_KEY = b9bcb413d20f8e8bec2652022eb63065aa1e9de5"        # Windows PowerShell
-# export CENSUS_API_KEY=b9bcb413d20f8e8bec2652022eb63065aa1e9de5        # Mac/Linux
+$env:CENSUS_API_KEY = "YOUR_KEY_HERE"      # Windows PowerShell
+# export CENSUS_API_KEY=YOUR_KEY_HERE      # Mac/Linux
 python -m restaurant_expansion.census --out data/real --naics 7225
 python -m restaurant_expansion --restaurants data/real/restaurants.csv --candidates data/real/candidate_cities.csv --target sales --evaluate --out outputs/real
 
