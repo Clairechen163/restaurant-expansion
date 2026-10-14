@@ -4,6 +4,7 @@ import pytest
 
 from restaurant_expansion.analysis import rank_candidates, run
 from restaurant_expansion.evaluation import (
+    cv_interval_coverage,
     holdout_check,
     kfold_cv,
     prediction_interval,
@@ -147,3 +148,39 @@ def test_command_line_help_and_end_to_end(tmp_path, monkeypatch, capsys):
     out = capsys.readouterr().out
     assert "elasticity" in out and "Held-out cities" in out
     assert (tmp_path / "out" / "holdout_check.csv").exists()
+
+
+def test_interval_coverage_is_about_95_percent_when_the_model_is_right():
+    rng = np.random.default_rng(2)
+    x = rng.uniform(5, 100, 900)
+    y = 3 + 2 * x + rng.normal(0, 8, 900)
+    cov = cv_interval_coverage(x, y, k=5)
+    assert 0.92 <= cov["overall"] <= 0.98
+    assert all(0.88 <= c <= 1.0 for c in cov["by_size"])
+    assert sum(cov["n_by_size"]) == 900
+
+
+def test_constant_spread_intervals_are_uneven_by_size_and_log_intervals_are_not():
+    x, y = power_law(n=900, sigma=0.3, seed=4)
+    lin, log = cv_interval_coverage(x, y), cv_interval_coverage(x, y, log=True)
+    assert max(lin["by_size"]) - min(lin["by_size"]) > 0.05    # uneven across city sizes
+    assert max(log["by_size"]) - min(log["by_size"]) < 0.06    # roughly even
+    assert 0.92 <= log["overall"] <= 0.98
+    with pytest.raises(ValueError):
+        cv_interval_coverage(x, y, k=1)
+
+
+def test_holdout_check_reports_whether_actual_is_inside_the_interval():
+    ranked = pd.DataFrame({"city": ["a", "b"], "population": [1, 2], "predicted_sales": [90.0, 150.0]})
+    actuals = pd.DataFrame({"city": ["a", "b"], "actual_sales": [100.0, 100.0]})
+    check = holdout_check(ranked, actuals, "sales", lower=[80.0, 110.0], upper=[120.0, 190.0])
+    assert check["inside_95"].tolist() == [True, False]
+    assert "inside 95% interval = 1/2" in summarize_holdout(check)
+
+
+def test_evaluation_report_includes_coverage(tmp_path):
+    x, y = power_law(n=120)
+    train = pd.DataFrame({"city": [f"c{i}" for i in range(120)], "population": x, "sales": y})
+    res = run_evaluation(train, tmp_path, target="sales", log=True)
+    assert "prediction-interval coverage" in res["report"]
+    assert 0.8 <= res["coverage"]["overall"] <= 1.0

@@ -3,7 +3,7 @@ import argparse
 import pandas as pd
 
 from .analysis import run
-from .evaluation import holdout_check, run_evaluation, summarize_holdout
+from .evaluation import holdout_check, prediction_interval, run_evaluation, summarize_holdout
 
 
 def main():
@@ -32,7 +32,9 @@ def main():
     print(f"\nSaved results to {a.out}/")
 
     if a.actuals:
-        check = holdout_check(ranked, pd.read_csv(a.actuals), a.target)
+        train = pd.read_csv(a.restaurants)
+        lo, hi = prediction_interval(model, train["population"], train[a.target], ranked["population"])
+        check = holdout_check(ranked, pd.read_csv(a.actuals), a.target, lo, hi)
         check.to_csv(f"{a.out}/holdout_check.csv", index=False)
         print("\n" + check.to_string(index=False, float_format=lambda v: f"{v:.1f}"))
         print(summarize_holdout(check))

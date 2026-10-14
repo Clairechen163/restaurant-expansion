@@ -93,6 +93,39 @@ def prediction_interval(model: LinearRegression, x_train, y_train, x_new,
     return center - t * se, center + t * se
 
 
+def cv_interval_coverage(x, y, k: int = 5, seed: int = 0, log: bool = False, level: float = 0.95) -> dict:
+    """How often does the 95% prediction interval really contain the true value?
+
+    Intervals are built from the training folds only and checked on the held-out
+    fold, so this is an honest out-of-sample test. Coverage is also reported by
+    city size (thirds of the population range), because intervals that assume
+    constant spread tend to be too wide for small cities and too narrow for big ones.
+    """
+    x = np.asarray(x, dtype=float).ravel()
+    y = np.asarray(y, dtype=float).ravel()
+    n = x.size
+    if not 2 <= k <= n:
+        raise ValueError("k must satisfy 2 <= k <= number of samples")
+    idx = np.random.default_rng(seed).permutation(n)
+    inside = np.zeros(n, dtype=bool)
+    width = np.empty(n)
+    for fold in np.array_split(idx, k):
+        train = np.setdiff1d(idx, fold)
+        m = (LogLogRegression() if log else LinearRegression("normal")).fit(x[train], y[train])
+        lo, hi = prediction_interval(m, x[train], y[train], x[fold], level)
+        inside[fold] = (y[fold] >= lo) & (y[fold] <= hi)
+        width[fold] = (hi - lo) / np.maximum(np.abs(y[fold]), 1e-12)   # relative to the true value
+    edges = np.quantile(x, [1 / 3, 2 / 3])
+    group = np.digitize(x, edges)
+    return {
+        "level": level,
+        "overall": float(inside.mean()),
+        "by_size": [float(inside[group == g].mean()) for g in range(3)],
+        "n_by_size": [int((group == g).sum()) for g in range(3)],
+        "median_relative_width": float(np.median(width)),
+    }
+
+
 def residual_diagnostics(model, x, y) -> dict:
     x = np.asarray(x, dtype=float).ravel()
     _, resid = _fitted_and_resid(model, x, y)
@@ -157,24 +190,36 @@ def plot_residuals(model, x, y, path, target: str = "profit") -> None:
     plt.close(fig)
 
 
-def holdout_check(ranked: pd.DataFrame, actuals: pd.DataFrame, target: str) -> pd.DataFrame:
-    """Compare predictions for held-out cities with their true values (percent error)."""
+def holdout_check(ranked: pd.DataFrame, actuals: pd.DataFrame, target: str,
+                  lower=None, upper=None) -> pd.DataFrame:
+    """Compare predictions for held-out cities with their true values (percent error).
+
+    If ``lower``/``upper`` (95% interval bounds, aligned with ``ranked``) are given,
+    also report whether each true value fell inside its interval.
+    """
     pred = f"predicted_{target}"
     actual = f"actual_{target}"
     if actual not in actuals.columns:
         raise ValueError(f"actuals file needs columns city and {actual}")
-    out = ranked[["city", "population", pred]].merge(actuals[["city", actual]], on="city")
+    base = ranked[["city", "population", pred]].copy()
+    if lower is not None and upper is not None:
+        base["lower_95"], base["upper_95"] = np.asarray(lower), np.asarray(upper)
+    out = base.merge(actuals[["city", actual]], on="city")
     out["error_pct"] = (out[pred] - out[actual]) / out[actual] * 100
+    if "lower_95" in out:
+        out["inside_95"] = (out[actual] >= out["lower_95"]) & (out[actual] <= out["upper_95"])
     return out
 
 
 def summarize_holdout(check: pd.DataFrame) -> str:
     err = check["error_pct"].to_numpy()
     ape = np.abs(err)
+    inside = (f", inside 95% interval = {int(check['inside_95'].sum())}/{len(err)}"
+              if "inside_95" in check else "")
     return (f"Held-out cities: n = {len(err)}, mean absolute % error = {ape.mean():.1f}%, "
             f"median = {np.median(ape):.1f}%, within 15% = {int((ape <= 15).sum())}/{len(err)}, "
             f"within 30% = {int((ape <= 30).sum())}/{len(err)}, "
-            f"under-predicted = {int((err < 0).sum())}/{len(err)}")
+            f"under-predicted = {int((err < 0).sum())}/{len(err)}{inside}")
 
 
 def run_evaluation(train: pd.DataFrame, out_dir="outputs", k: int = 5, seed: int = 0,
@@ -187,6 +232,7 @@ def run_evaluation(train: pd.DataFrame, out_dir="outputs", k: int = 5, seed: int
 
     cv = kfold_cv(x, y, k=k, seed=seed, log=log)
     diag = residual_diagnostics(model, x, y)
+    cov = cv_interval_coverage(x, y, k=k, seed=seed, log=log)
     plot_residuals(model, x, y, out / "residuals.png", target)
 
     gain = 1 - cv["rmse"] / cv["baseline_rmse"]
@@ -207,7 +253,13 @@ def run_evaluation(train: pd.DataFrame, out_dir="outputs", k: int = 5, seed: int
         f"  Shapiro-Wilk p-value     {diag['shapiro_p']:.3f}   (p > 0.05: no evidence against normal errors)",
         f"  |resid| vs. population   Spearman rho = {diag['abs_resid_vs_x_rho']:+.2f}, "
         f"p = {diag['abs_resid_vs_x_p']:.3f}   (small p: spread changes with city size)",
+        "",
+        f"95% prediction-interval coverage (out-of-fold; ideal = {cov['level']:.0%})",
+        f"  overall                  {cov['overall']:.1%}",
+        "  small / medium / large   " + " / ".join(f"{c:.1%}" for c in cov["by_size"])
+        + f"   (n = {' / '.join(str(v) for v in cov['n_by_size'])})",
+        f"  median interval width    {cov['median_relative_width']:.0%} of the true value",
     ]
     report = "\n".join(lines)
     (out / "evaluation.txt").write_text(report + "\n", encoding="utf-8")
-    return {"cv": cv, "diagnostics": diag, "report": report}
+    return {"cv": cv, "diagnostics": diag, "coverage": cov, "report": report}
