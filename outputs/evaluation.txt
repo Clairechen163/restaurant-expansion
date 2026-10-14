@@ -1,0 +1,11 @@
+Evaluation (60 cities, 5-fold cross-validation, seed=0)
+Units: profit in $10,000s
+
+Model      RMSE = 2.883   MAE = 2.315   out-of-fold R^2 = 0.598
+Baseline   RMSE = 4.584   (always predict the mean profit)
+The model cuts the baseline error by 37%.
+
+Residual diagnostics
+  mean residual            +0.000   (should be ~0)
+  Shapiro-Wilk p-value     0.190   (p > 0.05: no evidence against normal errors)
+  |resid| vs. population   Spearman rho = +0.17, p = 0.189   (small p: spread changes with city size)

@@ -1,0 +1,9 @@
+rank,city,population,predicted_profit,recommend
+1,Metro City,24.5,27.48020820291186,True
+2,Northgate,18.9,19.88006680266334,True
+3,Port Avery,14.8,14.315677563195681,True
+4,Hillcrest,11.0,9.158438755884186,True
+5,Eastbrook,9.6,7.258403405822056,True
+6,Lakeside,7.2,4.001199948572694,True
+7,Maple Falls,5.4,1.5582973556356707,True
+8,Riverton,3.5,-1.020322048020076,False

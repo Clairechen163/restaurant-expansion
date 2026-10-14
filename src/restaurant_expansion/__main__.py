@@ -1,6 +1,9 @@
 import argparse
 
+import pandas as pd
+
 from .analysis import run
+from .evaluation import run_evaluation
 
 
 def main():
@@ -9,6 +12,9 @@ def main():
     p.add_argument("--candidates", default="data/candidate_cities.csv")
     p.add_argument("--out", default="outputs")
     p.add_argument("--method", choices=["normal", "gd"], default="normal")
+    p.add_argument("--evaluate", action="store_true",
+                   help="also run cross-validation and residual diagnostics")
+    p.add_argument("--folds", type=int, default=5, help="number of CV folds (with --evaluate)")
     a = p.parse_args()
 
     model, ranked, r2 = run(a.restaurants, a.candidates, a.out, a.method)
@@ -16,6 +22,11 @@ def main():
     print("Units: population in 10,000s, profit in $10,000s\n")
     print(ranked.to_string(index=False, float_format=lambda v: f"{v:.2f}"))
     print(f"\nSaved results to {a.out}/")
+
+    if a.evaluate:
+        result = run_evaluation(pd.read_csv(a.restaurants), a.out, k=a.folds)
+        print("\n" + result["report"])
+        print(f"\nSaved evaluation.txt and residuals.png to {a.out}/")
 
 
 if __name__ == "__main__":

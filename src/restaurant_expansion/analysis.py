@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+from .evaluation import prediction_interval
 from .model import LinearRegression
 
 # Units follow the classic version of this problem:
@@ -41,6 +42,8 @@ def plot_fit(train, cand_ranked, model, path):
     ax.scatter(train["population"], train["profit"], marker="x", c="tab:red", label="Existing restaurants")
     xs = np.linspace(0, max(train["population"].max(), cand_ranked["population"].max()) * 1.05, 100)
     ax.plot(xs, model.predict(xs), label=f"Fit: {model.intercept_:.2f} + {model.coef_:.2f}·pop")
+    lo, hi = prediction_interval(model, train["population"], train["profit"], xs)
+    ax.fill_between(xs, lo, hi, color="tab:blue", alpha=0.12, label="95% prediction interval")
     ax.scatter(cand_ranked["population"], cand_ranked["predicted_profit"],
                c="tab:green", marker="o", label="Candidate cities (predicted)")
     for _, r in cand_ranked.iterrows():
