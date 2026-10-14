@@ -30,6 +30,12 @@ python -m restaurant_expansion --method gd     # gradient descent + convergence 
 python -m restaurant_expansion --evaluate      # cross-validation + residual diagnostics
 pytest                                         # run tests
 
+# Real data (free Census API key: https://api.census.gov/data/key_signup.html)
+$env:CENSUS_API_KEY = b9bcb413d20f8e8bec2652022eb63065aa1e9de5"        # Windows PowerShell
+# export CENSUS_API_KEY=b9bcb413d20f8e8bec2652022eb63065aa1e9de5        # Mac/Linux
+python -m restaurant_expansion.census --out data/real --naics 7225
+python -m restaurant_expansion --restaurants data/real/restaurants.csv --candidates data/real/candidate_cities.csv --target sales --evaluate --out outputs/real
+
 pip install -r requirements-app.txt
 python -m streamlit run app/streamlit_app.py   # interactive dashboard
 ```

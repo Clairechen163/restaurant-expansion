@@ -7,6 +7,7 @@ import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from matplotlib.ticker import FuncFormatter
 import numpy as np
 import pandas as pd
 
@@ -38,6 +39,37 @@ def rank_candidates(model: LinearRegression, cand: pd.DataFrame, target: str = "
     return out
 
 
+def _thousands(value, _pos=None):
+    """Tick formatter: 700000 -> '700,000'."""
+    return f"{value:,.0f}"
+
+
+def _label_points(ax, cand, pred_col):
+    """Label candidate cities, choosing a layout that stays readable.
+
+    If candidates are spread out, labels sit next to their points. If any two are
+    close together (typical of real data, with many small cities), the names would
+    overprint, so they are stacked in a column with thin leader lines instead.
+    """
+    xs = np.sort(cand["population"].to_numpy(dtype=float))
+    span = max(xs.max() - xs.min(), 1e-9)
+    crowded = len(xs) > 1 and np.min(np.diff(xs)) / span < 0.04
+    if not crowded:
+        for _, r in cand.iterrows():
+            ax.annotate(r["city"], (r["population"], r[pred_col]),
+                        textcoords="offset points", xytext=(5, -10), fontsize=8)
+        return
+    n = len(cand)
+    step = min(0.055, 0.45 / max(n, 1))
+    for i, (_, r) in enumerate(cand.sort_values("population", ascending=False).iterrows()):
+        ax.annotate(
+            f"{r['city']}  ({r[pred_col]:,.0f})", (r["population"], r[pred_col]),
+            xycoords="data", textcoords="axes fraction",
+            xytext=(0.60, 0.36 - i * step), fontsize=8, ha="left", va="center",
+            arrowprops={"arrowstyle": "-", "color": "gray", "lw": 0.5, "alpha": 0.7},
+        )
+
+
 def plot_fit(train, cand_ranked, model, path, target="profit"):
     pred = f"predicted_{target}"
     fig, ax = plt.subplots(figsize=(8, 5))
@@ -48,14 +80,14 @@ def plot_fit(train, cand_ranked, model, path, target="profit"):
     ax.fill_between(xs, lo, hi, color="tab:blue", alpha=0.12, label="95% prediction interval")
     ax.scatter(cand_ranked["population"], cand_ranked[pred],
                c="tab:green", marker="o", label="Candidate cities (predicted)")
-    for _, r in cand_ranked.iterrows():
-        ax.annotate(r["city"], (r["population"], r[pred]),
-                    textcoords="offset points", xytext=(5, -10), fontsize=8)
+    _label_points(ax, cand_ranked, pred)
     ax.axhline(0, color="gray", lw=0.8)
     ax.set_xlabel("City population (10,000s)")
     ax.set_ylabel(f"{target.capitalize()} ($10,000s)")
     ax.set_title(f"{target.capitalize()} vs. city population")
-    ax.legend()
+    ax.xaxis.set_major_formatter(FuncFormatter(_thousands))
+    ax.yaxis.set_major_formatter(FuncFormatter(_thousands))
+    ax.legend(loc="upper left")
     fig.tight_layout()
     fig.savefig(path, dpi=150)
     plt.close(fig)

@@ -12,6 +12,7 @@ import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from matplotlib.ticker import FuncFormatter, MaxNLocator
 import numpy as np
 import pandas as pd
 from scipy import stats
@@ -99,6 +100,10 @@ def residual_diagnostics(model: LinearRegression, x, y) -> dict:
     }
 
 
+def _thousands(value, _pos=None):
+    return f"{value:,.0f}"
+
+
 def plot_residuals(model: LinearRegression, x, y, path, target: str = "profit") -> None:
     x = np.asarray(x, dtype=float).ravel()
     y = np.asarray(y, dtype=float).ravel()
@@ -113,6 +118,12 @@ def plot_residuals(model: LinearRegression, x, y, path, target: str = "profit") 
     axes[1].set(xlabel="Residual", ylabel="Count", title="Residual distribution")
     stats.probplot(resid, dist="norm", plot=axes[2])
     axes[2].set_title("Normal Q-Q plot")
+    for ax in (axes[0], axes[2]):
+        ax.yaxis.set_major_formatter(FuncFormatter(_thousands))
+    axes[0].xaxis.set_major_locator(MaxNLocator(5))
+    axes[0].xaxis.set_major_formatter(FuncFormatter(_thousands))
+    axes[1].xaxis.set_major_locator(MaxNLocator(5))
+    axes[1].xaxis.set_major_formatter(FuncFormatter(_thousands))
     fig.tight_layout()
     fig.savefig(path, dpi=150)
     plt.close(fig)
