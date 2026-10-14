@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 
 from .evaluation import prediction_interval
-from .model import LinearRegression
+from .model import LinearRegression, LogLogRegression
 
 # Units follow the classic version of this problem:
 #   population in 10,000s of people, profit in $10,000s.
@@ -74,14 +74,26 @@ def plot_fit(train, cand_ranked, model, path, target="profit"):
     pred = f"predicted_{target}"
     fig, ax = plt.subplots(figsize=(8, 5))
     ax.scatter(train["population"], train[target], marker="x", c="tab:red", label="Existing restaurants")
-    xs = np.linspace(0, max(train["population"].max(), cand_ranked["population"].max()) * 1.05, 100)
-    ax.plot(xs, model.predict(xs), label=f"Fit: {model.intercept_:.2f} + {model.coef_:.2f}·pop")
+    log = isinstance(model, LogLogRegression)
+    top = max(train["population"].max(), cand_ranked["population"].max()) * 1.05
+    if log:
+        low = min(train["population"].min(), cand_ranked["population"].min()) * 0.8
+        xs = np.geomspace(low, top, 120)
+        fit_label = f"Fit: {target} ∝ pop^{model.coef_:.2f}"
+    else:
+        xs = np.linspace(0, top, 100)
+        fit_label = f"Fit: {model.intercept_:.2f} + {model.coef_:.2f}·pop"
+    ax.plot(xs, model.predict(xs), label=fit_label)
     lo, hi = prediction_interval(model, train["population"], train[target], xs)
     ax.fill_between(xs, lo, hi, color="tab:blue", alpha=0.12, label="95% prediction interval")
     ax.scatter(cand_ranked["population"], cand_ranked[pred],
                c="tab:green", marker="o", label="Candidate cities (predicted)")
     _label_points(ax, cand_ranked, pred)
-    ax.axhline(0, color="gray", lw=0.8)
+    if log:
+        ax.set_xscale("log")
+        ax.set_yscale("log")
+    else:
+        ax.axhline(0, color="gray", lw=0.8)
     ax.set_xlabel("City population (10,000s)")
     ax.set_ylabel(f"{target.capitalize()} ($10,000s)")
     ax.set_title(f"{target.capitalize()} vs. city population")
@@ -104,11 +116,14 @@ def plot_convergence(model, path):
     plt.close(fig)
 
 
-def run(restaurants_csv, candidates_csv, out_dir="outputs", method="normal", target="profit"):
+def run(restaurants_csv, candidates_csv, out_dir="outputs", method="normal", target="profit", log=False):
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
     train, cand = load_data(restaurants_csv, candidates_csv, target)
-    model = LinearRegression(method=method).fit(train["population"], train[target])
+    if log and method != "normal":
+        raise ValueError("--log uses the closed-form solver; drop --method gd")
+    model = LogLogRegression() if log else LinearRegression(method=method)
+    model.fit(train["population"], train[target])
     ranked = rank_candidates(model, cand, target)
     ranked.to_csv(out / "ranked_candidates.csv", index=False)
     plot_fit(train, ranked, model, out / "fit.png", target)

@@ -58,3 +58,53 @@ class LinearRegression:
         ss_res = np.sum((y - self.predict(x)) ** 2)
         ss_tot = np.sum((y - y.mean()) ** 2)
         return float(1 - ss_res / ss_tot)
+
+
+class LogLogRegression:
+    """log(y) = a + b * log(x): a power law y ~ x**b, fitted by least squares on logs.
+
+    Why: when spread grows with city size (as with real sales data), errors are
+    proportional, not constant. Working in logs makes the spread roughly constant
+    and makes the model minimise *percentage* error. ``coef_`` is the elasticity:
+    a 1% larger population goes with a ``coef_``% larger y.
+
+    ``predict`` returns the expected value of y (log-scale prediction times
+    Duan's smearing factor, which corrects the bias from back-transforming).
+    """
+
+    def __init__(self):
+        self.linear_ = LinearRegression("normal")
+        self.intercept_: float = 0.0     # a, on the log scale
+        self.coef_: float = 0.0          # b, the elasticity
+        self.smearing_: float = 1.0
+
+    @staticmethod
+    def _logs(x, y=None):
+        x = np.asarray(x, dtype=float).ravel()
+        if np.any(x <= 0):
+            raise ValueError("log model needs strictly positive population")
+        if y is None:
+            return np.log(x)
+        y = np.asarray(y, dtype=float).ravel()
+        if np.any(y <= 0):
+            raise ValueError("log model needs strictly positive target values")
+        return np.log(x), np.log(y)
+
+    def fit(self, x, y) -> "LogLogRegression":
+        lx, ly = self._logs(x, y)
+        self.linear_.fit(lx, ly)
+        self.intercept_, self.coef_ = self.linear_.intercept_, self.linear_.coef_
+        self.smearing_ = float(np.mean(np.exp(ly - self.linear_.predict(lx))))
+        return self
+
+    def predict_log(self, x) -> np.ndarray:
+        return self.linear_.predict(self._logs(x))
+
+    def predict(self, x) -> np.ndarray:
+        return self.smearing_ * np.exp(self.predict_log(x))
+
+    def score(self, x, y) -> float:
+        """R^2 in the original units (comparable with LinearRegression.score)."""
+        y = np.asarray(y, dtype=float).ravel()
+        ss_res = np.sum((y - self.predict(x)) ** 2)
+        return float(1 - ss_res / np.sum((y - y.mean()) ** 2))

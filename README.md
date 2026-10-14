@@ -36,6 +36,8 @@ $env:CENSUS_API_KEY = "YOUR_KEY_HERE"      # Windows PowerShell
 python -m restaurant_expansion.census --out data/real --naics 7225
 python -m restaurant_expansion --restaurants data/real/restaurants.csv --candidates data/real/candidate_cities.csv --target sales --evaluate --out outputs/real
 
+python -m restaurant_expansion --restaurants data/real/restaurants.csv --candidates data/real/candidate_cities.csv --target sales --evaluate --log --out outputs/real_log   # log-log model
+
 pip install -r requirements-app.txt
 python -m streamlit run app/streamlit_app.py   # interactive dashboard
 ```
@@ -105,8 +107,29 @@ Fitted line: sales ≈ −$63M + $20M per 10,000 residents (about **$2,000 of re
 - **R² flatters the model.** Sales scale almost proportionally with population, so R² is dominated by the gap between big and small metros. On the 8 held-out metros the typical error is **22.6%** (3 of 8 within 15%, 6 of 8 within 30%), and 7 of 8 were under-predicted (median −23.5%). With only 8 metros this is indicative, not conclusive.
 - **Population alone is not enough.** In these 8 metros, sales per resident ranges from about $1,300 (Portsmouth, OH) to about $2,900 (Boulder, CO), while the model assumes a single slope.
 - **Assumption check fails, and I report it.** Residual spread grows with metro size (Spearman ρ = +0.60, p < 0.001) and residuals are not normal (Shapiro-Wilk p < 0.001). The constant-variance 95% prediction intervals are therefore unreliable here: too narrow for large metros, too wide for small ones.
-- **Next step:** fit log(sales) on log(population), which targets percentage error and makes the spread roughly constant.
 
+### Linear vs. log-log
+
+The linear model's residual spread grows with metro size, so I also fitted `log(sales)` on `log(population)` (`--log`), which models proportional error. Same 541 metros, same 8 held-out:
+
+| | Linear | Log-log |
+|---|---|---|
+| CV RMSE | $190.7M | $192.7M |
+| CV out-of-fold R² | 0.960 | 0.959 |
+| CV median abs % error | 18.0% | 15.4% |
+| CV mean abs % error | 21.8% | 21.9% |
+| Held-out mean abs % error (n = 8) | 22.6% | 14.1% |
+| Held-out within 15% / within 30% | 3/8 / 6/8 | 4/8 / 7/8 |
+| Held-out under-predicted | 7/8 | 5/8 |
+| \|residual\| vs. size, Spearman ρ | +0.60 | −0.21 |
+| Shapiro-Wilk p | < 0.001 | < 0.001 |
+
+- The log model **largely fixes the growing-spread problem** and lowers the typical percentage error, and its 95% intervals are multiplicative (narrow for small metros, wide for large ones).
+- It does **not** improve RMSE or mean percentage error, and residuals are still not normal (heavy tails), so intervals remain approximate.
+- Estimated elasticity is 1.11: 1% more population goes with about 1.11% more restaurant sales.
+- Held-out results use only 8 metros, so they are indicative, not conclusive. Boulder, CO is still under-predicted by 41%; population alone does not explain it.
+
+![Log-log residual diagnostics](docs/real_log_residuals.png)
 ![Real-data fit](docs/real_fit.png)
 ![Real-data residuals](docs/real_residuals.png)
 

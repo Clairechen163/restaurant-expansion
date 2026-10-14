@@ -17,10 +17,10 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 
-from .model import LinearRegression
+from .model import LinearRegression, LogLogRegression
 
 
-def kfold_cv(x, y, k: int = 5, seed: int = 0) -> dict:
+def kfold_cv(x, y, k: int = 5, seed: int = 0, log: bool = False) -> dict:
     """K-fold cross-validation of the linear model vs. a mean-only baseline.
 
     Metrics are computed on out-of-fold predictions, i.e. on cities the model
@@ -38,7 +38,7 @@ def kfold_cv(x, y, k: int = 5, seed: int = 0) -> dict:
     base = np.empty(n)
     for fold in folds:
         train = np.setdiff1d(idx, fold)
-        m = LinearRegression("normal").fit(x[train], y[train])
+        m = (LogLogRegression() if log else LinearRegression("normal")).fit(x[train], y[train])
         pred[fold] = m.predict(x[fold])
         base[fold] = y[train].mean()
 
@@ -46,7 +46,10 @@ def kfold_cv(x, y, k: int = 5, seed: int = 0) -> dict:
         return float(np.sqrt(np.mean((y - p) ** 2)))
 
     ss_tot = float(np.sum((y - y.mean()) ** 2))
+    ape = np.abs(y - pred) / np.abs(y) * 100 if np.all(y > 0) else None
     return {
+        "mape": None if ape is None else float(ape.mean()),
+        "median_ape": None if ape is None else float(np.median(ape)),
         "k": k,
         "n": n,
         "rmse": rmse(pred),
@@ -66,6 +69,13 @@ def prediction_interval(model: LinearRegression, x_train, y_train, x_new,
     """
     if kind not in {"prediction", "mean"}:
         raise ValueError("kind must be 'prediction' or 'mean'")
+    if _is_log(model):
+        # Interval on the log scale, then back-transformed: a multiplicative band
+        # that is narrow for small cities and wide for large ones.
+        lo, hi = prediction_interval(model.linear_, np.log(np.asarray(x_train, dtype=float)),
+                                     np.log(np.asarray(y_train, dtype=float)),
+                                     np.log(np.asarray(x_new, dtype=float)), level, kind)
+        return np.exp(lo), np.exp(hi)
     x = np.asarray(x_train, dtype=float).ravel()
     y = np.asarray(y_train, dtype=float).ravel()
     n = x.size
@@ -83,11 +93,9 @@ def prediction_interval(model: LinearRegression, x_train, y_train, x_new,
     return center - t * se, center + t * se
 
 
-def residual_diagnostics(model: LinearRegression, x, y) -> dict:
+def residual_diagnostics(model, x, y) -> dict:
     x = np.asarray(x, dtype=float).ravel()
-    y = np.asarray(y, dtype=float).ravel()
-    fitted = model.predict(x)
-    resid = y - fitted
+    _, resid = _fitted_and_resid(model, x, y)
     shapiro_p = float(stats.shapiro(resid).pvalue) if resid.size >= 3 else float("nan")
     # Rough heteroscedasticity check: do residual magnitudes grow with population?
     rho, rho_p = stats.spearmanr(x, np.abs(resid))
@@ -104,40 +112,80 @@ def _thousands(value, _pos=None):
     return f"{value:,.0f}"
 
 
-def plot_residuals(model: LinearRegression, x, y, path, target: str = "profit") -> None:
+def _is_log(model) -> bool:
+    return isinstance(model, LogLogRegression)
+
+
+def _fitted_and_resid(model, x, y):
+    """Fitted values and residuals on the scale the model is fitted on.
+
+    For the log model this is log scale, which is where its assumptions
+    (constant spread, normal errors) are checked.
+    """
     x = np.asarray(x, dtype=float).ravel()
     y = np.asarray(y, dtype=float).ravel()
+    if _is_log(model):
+        fitted = model.predict_log(x)
+        return fitted, np.log(y) - fitted
     fitted = model.predict(x)
-    resid = y - fitted
+    return fitted, y - fitted
+
+
+def plot_residuals(model, x, y, path, target: str = "profit") -> None:
+    fitted, resid = _fitted_and_resid(model, x, y)
+    log = _is_log(model)
 
     fig, axes = plt.subplots(1, 3, figsize=(13, 3.8))
     axes[0].scatter(fitted, resid, c="tab:red", marker="x")
     axes[0].axhline(0, color="gray", lw=0.8)
-    axes[0].set(xlabel=f"Fitted {target} ($10,000s)", ylabel="Residual", title="Residuals vs. fitted")
+    fitted_label = f"Fitted log({target})" if log else f"Fitted {target} ($10,000s)"
+    resid_label = "Residual (log scale)" if log else "Residual"
+    axes[0].set(xlabel=fitted_label, ylabel=resid_label, title="Residuals vs. fitted")
     axes[1].hist(resid, bins=12, color="tab:blue", alpha=0.8)
-    axes[1].set(xlabel="Residual", ylabel="Count", title="Residual distribution")
+    axes[1].set(xlabel=resid_label, ylabel="Count", title="Residual distribution")
     stats.probplot(resid, dist="norm", plot=axes[2])
     axes[2].set_title("Normal Q-Q plot")
-    for ax in (axes[0], axes[2]):
-        ax.yaxis.set_major_formatter(FuncFormatter(_thousands))
     axes[0].xaxis.set_major_locator(MaxNLocator(5))
-    axes[0].xaxis.set_major_formatter(FuncFormatter(_thousands))
     axes[1].xaxis.set_major_locator(MaxNLocator(5))
-    axes[1].xaxis.set_major_formatter(FuncFormatter(_thousands))
+    if not log:  # raw dollar-sized numbers need thousands separators; log residuals are small
+        for ax in (axes[0], axes[2]):
+            ax.yaxis.set_major_formatter(FuncFormatter(_thousands))
+        axes[0].xaxis.set_major_formatter(FuncFormatter(_thousands))
+        axes[1].xaxis.set_major_formatter(FuncFormatter(_thousands))
     fig.tight_layout()
     fig.savefig(path, dpi=150)
     plt.close(fig)
 
 
+def holdout_check(ranked: pd.DataFrame, actuals: pd.DataFrame, target: str) -> pd.DataFrame:
+    """Compare predictions for held-out cities with their true values (percent error)."""
+    pred = f"predicted_{target}"
+    actual = f"actual_{target}"
+    if actual not in actuals.columns:
+        raise ValueError(f"actuals file needs columns city and {actual}")
+    out = ranked[["city", "population", pred]].merge(actuals[["city", actual]], on="city")
+    out["error_pct"] = (out[pred] - out[actual]) / out[actual] * 100
+    return out
+
+
+def summarize_holdout(check: pd.DataFrame) -> str:
+    err = check["error_pct"].to_numpy()
+    ape = np.abs(err)
+    return (f"Held-out cities: n = {len(err)}, mean absolute % error = {ape.mean():.1f}%, "
+            f"median = {np.median(ape):.1f}%, within 15% = {int((ape <= 15).sum())}/{len(err)}, "
+            f"within 30% = {int((ape <= 30).sum())}/{len(err)}, "
+            f"under-predicted = {int((err < 0).sum())}/{len(err)}")
+
+
 def run_evaluation(train: pd.DataFrame, out_dir="outputs", k: int = 5, seed: int = 0,
-                   target: str = "profit") -> dict:
+                   target: str = "profit", log: bool = False) -> dict:
     """Fit on all data, cross-validate, run diagnostics, and write a text report + plot."""
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
     x, y = train["population"].to_numpy(), train[target].to_numpy()
-    model = LinearRegression("normal").fit(x, y)
+    model = (LogLogRegression() if log else LinearRegression("normal")).fit(x, y)
 
-    cv = kfold_cv(x, y, k=k, seed=seed)
+    cv = kfold_cv(x, y, k=k, seed=seed, log=log)
     diag = residual_diagnostics(model, x, y)
     plot_residuals(model, x, y, out / "residuals.png", target)
 
@@ -145,12 +193,16 @@ def run_evaluation(train: pd.DataFrame, out_dir="outputs", k: int = 5, seed: int
     lines = [
         f"Evaluation ({cv['n']} cities, {k}-fold cross-validation, seed={seed})",
         f"Units: {target} in $10,000s",
+        f"Model form: {'log-log (power law, errors in %)' if log else 'linear'}",
         "",
         f"Model      RMSE = {cv['rmse']:.3f}   MAE = {cv['mae']:.3f}   out-of-fold R^2 = {cv['r2']:.3f}",
+        *([f"Model      mean abs % error = {cv['mape']:.1f}%   median abs % error = {cv['median_ape']:.1f}%"]
+          if cv["mape"] is not None else []),
         f"Baseline   RMSE = {cv['baseline_rmse']:.3f}   (always predict the mean {target})",
         f"The model cuts the baseline error by {gain:.0%}.",
         "",
         "Residual diagnostics",
+        f"  (residuals on the {'log' if log else 'original'} scale)",
         f"  mean residual            {diag['resid_mean']:+.3f}   (should be ~0)",
         f"  Shapiro-Wilk p-value     {diag['shapiro_p']:.3f}   (p > 0.05: no evidence against normal errors)",
         f"  |resid| vs. population   Spearman rho = {diag['abs_resid_vs_x_rho']:+.2f}, "
