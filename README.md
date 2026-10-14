@@ -25,15 +25,16 @@ python -m venv .venv
 pip install -r requirements.txt
 pip install -e .
 
-python -m restaurant_expansion              # closed-form (normal equation)
-python -m restaurant_expansion --method gd  # gradient descent + convergence plot
-pytest                                      # run tests
+python -m restaurant_expansion                 # closed-form (normal equation)
+python -m restaurant_expansion --method gd     # gradient descent + convergence plot
+python -m restaurant_expansion --evaluate      # cross-validation + residual diagnostics
+pytest                                         # run tests
 
 pip install -r requirements-app.txt
 python -m streamlit run app/streamlit_app.py   # interactive dashboard
 ```
 
-Outputs go to `outputs/`: `ranked_candidates.csv`, `fit.png`, and `convergence.png` (gd only).
+Outputs go to `outputs/`: `ranked_candidates.csv`, `fit.png`, `convergence.png` (gd only), and with `--evaluate`, `evaluation.txt` and `residuals.png`.
 
 ## Data format
 
@@ -54,13 +55,16 @@ Units: population in **10,000s**, profit in **$10,000s** (e.g. `population=7.2` 
 ## Project layout
 
 ```
-data/        sample CSVs
-scripts/     make_sample_data.py (regenerates the synthetic data)
-src/restaurant_expansion/
-  model.py     LinearRegression
-  analysis.py  load, rank, plot
-  __main__.py  CLI
-tests/       pytest suite
+   app/         streamlit_app.py (interactive dashboard)
+   data/        sample CSVs
+   docs/        fit.png, residuals.png
+   scripts/     make_sample_data.py (regenerates the synthetic data)
+   src/restaurant_expansion/
+     model.py       LinearRegression
+     evaluation.py  cross-validation, prediction intervals, diagnostics
+     analysis.py    load, rank, plot
+     __main__.py    CLI
+   tests/       pytest suite
 ```
 
 ## Evaluation
