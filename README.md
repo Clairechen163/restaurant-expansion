@@ -118,8 +118,7 @@ The problem framing (predict restaurant profit from city population) follows a c
 
 ## Caveats and next steps
 
-- Population alone is a weak predictor (sample R² ≈ 0.6). Real decisions should also consider
-  rent, competition, income, foot traffic, and demographics.
+- Population alone is a weak predictor on the synthetic sample (R² ≈ 0.6); on real Census data it explains most of the total-sales variation (R² 0.96) but typical per-metro error is still about 23% (see above). Real decisions should also consider rent, competition, income, foot traffic and demographics.
 - Predictions for populations outside the range seen in existing cities (extrapolation) are unreliable.
   Check candidate cities whose population is larger than any existing outlet.
 ## License
