@@ -4,6 +4,7 @@ pyproject.toml
 src/restaurant_expansion/__init__.py
 src/restaurant_expansion/__main__.py
 src/restaurant_expansion/analysis.py
+src/restaurant_expansion/census.py
 src/restaurant_expansion/evaluation.py
 src/restaurant_expansion/model.py
 src/restaurant_expansion.egg-info/PKG-INFO
@@ -12,5 +13,6 @@ src/restaurant_expansion.egg-info/dependency_links.txt
 src/restaurant_expansion.egg-info/requires.txt
 src/restaurant_expansion.egg-info/top_level.txt
 tests/test_app.py
+tests/test_census.py
 tests/test_evaluation.py
 tests/test_model.py

@@ -99,7 +99,7 @@ def residual_diagnostics(model: LinearRegression, x, y) -> dict:
     }
 
 
-def plot_residuals(model: LinearRegression, x, y, path) -> None:
+def plot_residuals(model: LinearRegression, x, y, path, target: str = "profit") -> None:
     x = np.asarray(x, dtype=float).ravel()
     y = np.asarray(y, dtype=float).ravel()
     fitted = model.predict(x)
@@ -108,7 +108,7 @@ def plot_residuals(model: LinearRegression, x, y, path) -> None:
     fig, axes = plt.subplots(1, 3, figsize=(13, 3.8))
     axes[0].scatter(fitted, resid, c="tab:red", marker="x")
     axes[0].axhline(0, color="gray", lw=0.8)
-    axes[0].set(xlabel="Fitted profit ($10,000s)", ylabel="Residual", title="Residuals vs. fitted")
+    axes[0].set(xlabel=f"Fitted {target} ($10,000s)", ylabel="Residual", title="Residuals vs. fitted")
     axes[1].hist(resid, bins=12, color="tab:blue", alpha=0.8)
     axes[1].set(xlabel="Residual", ylabel="Count", title="Residual distribution")
     stats.probplot(resid, dist="norm", plot=axes[2])
@@ -118,24 +118,25 @@ def plot_residuals(model: LinearRegression, x, y, path) -> None:
     plt.close(fig)
 
 
-def run_evaluation(train: pd.DataFrame, out_dir="outputs", k: int = 5, seed: int = 0) -> dict:
+def run_evaluation(train: pd.DataFrame, out_dir="outputs", k: int = 5, seed: int = 0,
+                   target: str = "profit") -> dict:
     """Fit on all data, cross-validate, run diagnostics, and write a text report + plot."""
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
-    x, y = train["population"].to_numpy(), train["profit"].to_numpy()
+    x, y = train["population"].to_numpy(), train[target].to_numpy()
     model = LinearRegression("normal").fit(x, y)
 
     cv = kfold_cv(x, y, k=k, seed=seed)
     diag = residual_diagnostics(model, x, y)
-    plot_residuals(model, x, y, out / "residuals.png")
+    plot_residuals(model, x, y, out / "residuals.png", target)
 
     gain = 1 - cv["rmse"] / cv["baseline_rmse"]
     lines = [
         f"Evaluation ({cv['n']} cities, {k}-fold cross-validation, seed={seed})",
-        "Units: profit in $10,000s",
+        f"Units: {target} in $10,000s",
         "",
         f"Model      RMSE = {cv['rmse']:.3f}   MAE = {cv['mae']:.3f}   out-of-fold R^2 = {cv['r2']:.3f}",
-        f"Baseline   RMSE = {cv['baseline_rmse']:.3f}   (always predict the mean profit)",
+        f"Baseline   RMSE = {cv['baseline_rmse']:.3f}   (always predict the mean {target})",
         f"The model cuts the baseline error by {gain:.0%}.",
         "",
         "Residual diagnostics",
